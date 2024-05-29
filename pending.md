@@ -1,0 +1,3 @@
+
+
+chat.controls.js -> find personal chat --> Add last message functionality ....

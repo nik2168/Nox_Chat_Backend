@@ -1,0 +1,13 @@
+  port = 3333
+  secret= I am Secret!
+  name= Nox_Chat
+  MONGO_URI = mongodb+srv://Nik21:Nik%402072@backenddb.de7zblu.mongodb.net/ecom?retryWrites=true&w=majority&appName=Nox_Chat
+  TOKEN_NAME = nox_token
+  ADMIN_TOKEN_NAME = nox_admin_token
+  ADMIN_SECRET_KEY = starx21
+  NODE_ENV = DEVELOPMENT
+  CLOUDINARY_CLOUD_NAME = dki615p7n
+  CLOUDINARY_API_KEY = 944268389557841
+  CLOUDINARY_API_SECRET = 960xaEqUIH0R1PyIGjWEDNCU7xw
+  CLIENT_URL = frontend url
+  
