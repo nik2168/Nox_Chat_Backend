@@ -28,6 +28,7 @@ const {
   CHAT_JOINED,
   CHAT_LEAVE,
   ONLINE_USERS,
+  CHAT_ONLINE_USERS,
 } = require("./constants/events.js");
 const Message = require("./models/message.model.js");
 const { socketAuthenticator } = require("./middlewares/auth.mw.js");
@@ -45,6 +46,8 @@ dotenv.config({
 });
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
 
 mongoose
   .connect(process.env.MONGO_URI, { dbName: process.env.name })
@@ -108,8 +111,12 @@ io.on("connection", (socket) => {
 
   console.log("a user connected", socket.id);
 
-  socket.on(NEW_MESSAGE, async ({ message, chatid, members }) => {
+  socket.on(NEW_MESSAGE, async ({ message, chatid, members, isOnline, isChatOnline }) => {
     // we got this data from frontend for each chat
+
+    let status = "send"
+    if(isOnline === true) status = "online"
+    if(isChatOnline === true) status = "seen"
 
     const messageForRealTime = {
       // this will be the message for real time chatting ...
@@ -122,6 +129,7 @@ io.on("connection", (socket) => {
         chat: chatid,
         createdAt: new Date().toISOString(),
       },
+      status,
     };
 
     const messageForDb = {
@@ -130,6 +138,7 @@ io.on("connection", (socket) => {
       attachments: [],
       sender: user._id,
       chat: chatid,
+      status,
     };
 
     try {
@@ -170,29 +179,32 @@ io.on("connection", (socket) => {
 
     io.emit(ONLINE_USERS, Array.from(onlineUsers));
 
-  // socket.on(CHAT_JOINED, ({ userId, members }) => {
-  //       onlineUsers.add(userId.toString());
-  //   const membersSockets = members.map((member) =>
-  //     userSocketIds.get(member._id.toString())
-  //   );
-  //   console.log(membersSockets)
+  socket.on(CHAT_JOINED, ({ userId, members }) => {
+        onlineUsers.add(userId.toString());
+    const membersSockets = members.map((member) =>
+      userSocketIds.get(member._id.toString())
+    );
+    // console.log(membersSockets)
 
-  //   io.to(membersSockets).emit(ONLINE_USERS, Array.from(onlineUsers));
-  // });
+    io.to(membersSockets).emit(CHAT_ONLINE_USERS, Array.from(onlineUsers));
+  });
 
-  // socket.on(CHAT_LEAVE, ({ userId, members }) => {
-  //       onlineUsers.delete(userId.toString());
+  socket.on(CHAT_LEAVE, ({ userId, members }) => {
+        onlineUsers.delete(userId.toString());
 
-  //   const membersSockets = members.map((member) =>
-  //     userSocketIds.get(member._id.toString())
-  //   );
+    const membersSockets = members.map((member) =>
+      userSocketIds.get(member._id.toString())
+    );
 
-  //   io.to(membersSockets).emit(ONLINE_USERS, Array.from(onlineUsers));
-  // });
+    io.to(membersSockets).emit(CHAT_ONLINE_USERS, Array.from(onlineUsers));
+  });
 
   socket.on("disconnect", () => {
         onlineUsers.delete(user._id.toString());
+    userSocketIds.delete(user._id.toString());
         io.emit(ONLINE_USERS, Array.from(onlineUsers));
+      socket.broadcast.emit(CHAT_ONLINE_USERS,Array.from(onlineUsers));
+
     userSocketIds.delete(user._id.toString()); // will remove members from map once they dissconnected ...
     console.log("user dissconnected");
   });

@@ -16,6 +16,8 @@ const {
   getMessages,
   getChatProfileData,
   getLastMessageTime,
+  changeMessagesToOnline,
+  changeMessagesToSeen,
 } = require("../controllers/chat.controller.js");
 
 // middle wares
@@ -61,6 +63,8 @@ router.get("/groups", getMyGroups);
 router.get("/leave/:id", leaveGroupValidator(), validateHandler, leaveGroup);
 
 router.get("/getchatprofiledata/:id", getChatProfileData);
+router.get("/changemessagetoonline", changeMessagesToOnline);
+router.get("/changemessagetoseen/:id", changeMessagesToSeen);
 
 router.post(
   "/sendattachments",

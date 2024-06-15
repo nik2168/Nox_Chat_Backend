@@ -7,19 +7,24 @@ const messageSchema = new Schema(
     },
     attachments: [
       {
-      public_id: {
-        type: String,
-        required: true,
+        public_id: {
+          type: String,
+          required: true,
+        },
+        url: {
+          type: String,
+          required: true,
+        },
       },
-      url: {
-        type: String,
-        required: true,
-      },
-    },
     ],
     isAlert: {
-     type: Boolean,
-     default: false,
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      default: "send",
+      enum: ["send", "online", "seen"],
     },
     sender: {
       type: Types.ObjectId,
@@ -34,6 +39,7 @@ const messageSchema = new Schema(
   },
   {
     timestamps: true,
+    versionKey: false,
   }
 );
 

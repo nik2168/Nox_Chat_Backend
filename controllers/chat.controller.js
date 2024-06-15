@@ -5,6 +5,7 @@ const {
   NEW_MESSAGE_ALERT,
   NEW_MESSAGE,
   MEMBER_REMOVED,
+  REFETCH_MESSAGES,
 } = require("../constants/events.js");
 const { v4 } = require("uuid");
 const Chat = require("../models/chat.model.js");
@@ -971,6 +972,73 @@ const getLastMessageTime = async (req, res) => {
   }
 };
 
+
+const changeMessagesToOnline = async (req, res) => {
+
+
+try{
+
+  const myChats = await Chat.find({members: req.userId, groupChat: false}).populate('members').lean()
+  const myChatsIds = myChats.map((chat) => {
+    return chat._id
+  })
+
+  const allMembers = myChats.map((chat) => {
+    return chat.members.filter((member) => member._id.toString() !== req.userId.toString())
+  }).flat()
+
+  const members = allMembers.map((member) => {
+    return member._id
+  })
+
+const messagesPromise = myChatsIds.map((curId) => {
+  const messages =  Message.updateMany({chat: curId, status: "send", sender: { $nin: req.userId.toString()}}, { $set: {status: "online"}})
+  return messages
+})
+
+const resolvedPromise = await Promise.all(messagesPromise)
+
+    emitEvent(req, REFETCH_MESSAGES, members, "online");
+
+return res.status(201).json({success: true, message: "messages's status changed from send to online successfully !", myChatsIds, members, userId: req.userId})
+
+}catch(err){ 
+  return res.status(400).json({success: false, message: "Error while changing the message status to online"})
+}
+
+}
+
+
+const changeMessagesToSeen = async (req, res) => {
+    const chatId = req.params.id
+
+try{
+const messages = await Message.updateMany(
+  {chat: chatId, status: "online", sender: {$nin: req.userId.toString()}},
+  {
+    $set: {
+      status: "seen",
+    },
+  },
+);
+
+const curChat = await Chat.findById(chatId).populate("members").lean()
+const allMembers = curChat.members.filter((member) => member._id.toString() !== req.userId.toString())
+const members = allMembers.map((member) => {
+  return member._id
+}).flat()
+
+    emitEvent(req, REFETCH_MESSAGES, members, "seen");
+
+
+return res.status(200).json({success: true, message: "messages's status changed from online to seen successfully !", messages, members})
+
+}catch(err){ 
+  return res.status(400).json({success: false, message: "Error while changing the message status to online"})
+}
+
+}
+
 module.exports = {
   newGroupChat,
   getMyChats,
@@ -985,4 +1053,6 @@ module.exports = {
   getMessages,
   getChatProfileData,
   getLastMessageTime,
+  changeMessagesToOnline,
+  changeMessagesToSeen,
 };
