@@ -33,9 +33,9 @@ const {
 const Message = require("./models/message.model.js");
 const { socketAuthenticator } = require("./middlewares/auth.mw.js");
 const { errorMiddleWare } = require("./middlewares/error.mw.js");
-const { userSocketIds } = require("./utils/features.js");
+const { userSocketIds, updateMessagesToOnline, updateChatMessagesToSeen } = require("./utils/features.js");
 const onlineUsers = new Set();
-const chatOnlineUsers = new Set();
+const chatOnlineUsers = new Map();
 const server = createServer(app);
 const io = new Server(server, { cors: corsOptions });
 
@@ -101,7 +101,7 @@ app.use((err, req, res, next) => {
 });
 
 // socket.io connection
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
   const user = socket.user;
   // will get all the users currently connected to socket
   // temp user
@@ -110,14 +110,20 @@ io.on("connection", (socket) => {
 
   console.log("a user connected", socket.id);
 
+    onlineUsers.add(user._id.toString());
+
+    io.emit(ONLINE_USERS, Array.from(onlineUsers));
+
+  await updateMessagesToOnline(user, io)
+
   socket.on(
     NEW_MESSAGE,
-    async ({ message, chatid, members, isOnline, isChatOnline }) => {
+    async ({ message, chatid, members, otherMember }) => {
       // we got this data from frontend for each chat
 
       let status = "send";
-      if (isOnline === true) status = "online";
-      if (isChatOnline === true) status = "seen";
+      if (onlineUsers.has(otherMember._id.toString())) status = "online";
+      if (chatOnlineUsers.has(otherMember._id.toString()) && chatOnlineUsers.get(otherMember._id.toString()).toString() === chatid.toString()) status = "seen";
 
       const messageForRealTime = {
         // this will be the message for real time chatting ...
@@ -177,18 +183,18 @@ io.on("connection", (socket) => {
     io.to(membersSockets).emit(STOP_TYPING, { chatid });
   });
 
-  onlineUsers.add(user._id.toString());
 
-  io.emit(ONLINE_USERS, Array.from(onlineUsers));
 
-  socket.on(CHAT_JOINED, ({ userId, members, chatid }) => {
-    chatOnlineUsers.add(userId.toString());
+  socket.on(CHAT_JOINED, async ({ userId, members, chatid }) => {
+    chatOnlineUsers.set(`${userId.toString()}`, chatid);
     const membersSockets = members.map((member) =>
       userSocketIds.get(member._id.toString())
     );
-    // console.log(membersSockets)
-
-    io.to(membersSockets).emit(CHAT_ONLINE_USERS, {chatOnlineMembers : Array.from(chatOnlineUsers), chatId: chatid});
+await updateChatMessagesToSeen(userId, chatid, members, io)
+ const chatOnlineUsersObj = Object.fromEntries(chatOnlineUsers.entries());
+    io.to(membersSockets).emit(CHAT_ONLINE_USERS, {
+      chatOnlineMembers: chatOnlineUsersObj,
+    });
   });
 
   socket.on(CHAT_LEAVE, ({ userId, members, chatid }) => {
@@ -198,7 +204,9 @@ io.on("connection", (socket) => {
       userSocketIds.get(member._id.toString())
     );
 
-    io.to(membersSockets).emit(CHAT_ONLINE_USERS, {chatOnlineMembers : Array.from(chatOnlineUsers), chatId: chatid});
+    io.to(membersSockets).emit(CHAT_ONLINE_USERS, {
+      chatOnlineMembers: Object.fromEntries(chatOnlineUsers.entries()),
+    });
   });
 
   socket.on("disconnect", () => {
@@ -206,7 +214,7 @@ io.on("connection", (socket) => {
     onlineUsers.delete(user._id.toString());
     chatOnlineUsers.delete(user._id.toString());
     io.emit(ONLINE_USERS, Array.from(onlineUsers));
-    socket.broadcast.emit(CHAT_ONLINE_USERS, Array.from(chatOnlineUsers));
+    socket.broadcast.emit(CHAT_ONLINE_USERS, {chatOnlineMembers : Object.fromEntries(chatOnlineUsers.entries())});
 
     userSocketIds.delete(user._id.toString()); // will remove members from map once they dissconnected ...
     console.log("user dissconnected");
