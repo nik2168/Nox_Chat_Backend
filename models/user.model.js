@@ -27,6 +27,11 @@ const userSchema = new Schema(
       type: String,
     },
 
+    lastSeen: {
+      type: String,
+      default: new Date().toISOString(),
+    },
+    
     avatar: {
       public_id: {
         type: String,

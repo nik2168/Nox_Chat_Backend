@@ -33,7 +33,10 @@ const {
 const Message = require("./models/message.model.js");
 const { socketAuthenticator } = require("./middlewares/auth.mw.js");
 const { errorMiddleWare } = require("./middlewares/error.mw.js");
-const { userSocketIds, updateMessagesToOnline, updateChatMessagesToSeen } = require("./utils/features.js");
+const {
+  userSocketIds,
+  updateLastSeen,
+} = require("./utils/features.js");
 const onlineUsers = new Set();
 const chatOnlineUsers = new Map();
 const server = createServer(app);
@@ -110,64 +113,63 @@ io.on("connection", async (socket) => {
 
   console.log("a user connected", socket.id);
 
-    onlineUsers.add(user._id.toString());
+  onlineUsers.add(user._id.toString());
 
-    io.emit(ONLINE_USERS, Array.from(onlineUsers));
+  io.emit(ONLINE_USERS, Array.from(onlineUsers));
 
-  await updateMessagesToOnline(user, io)
+  await updateLastSeen(user, io);
 
-  socket.on(
-    NEW_MESSAGE,
-    async ({ message, chatid, members, otherMember }) => {
-      // we got this data from frontend for each chat
+  socket.on(NEW_MESSAGE, async ({ message, chatid, members, otherMember }) => {
+    // we got this data from frontend for each chat
 
-      let status = "send";
-      if (onlineUsers.has(otherMember._id.toString())) status = "online";
-      if (chatOnlineUsers.has(otherMember._id.toString()) && chatOnlineUsers.get(otherMember._id.toString()).toString() === chatid.toString()) status = "seen";
 
-      const messageForRealTime = {
-        // this will be the message for real time chatting ...
-        content: message,
-        attachments: [],
-        _id: v4(), // generate a random _id temprary
-        sender: {
-          _id: user._id,
-          name: user.name,
-          chat: chatid,
-          createdAt: new Date().toISOString(),
-        },
-        status,
-      };
-
-      const messageForDb = {
-        // this format of message will save in our Message model
-        content: message,
-        attachments: [],
-        sender: user._id,
+    const messageForRealTime = {
+      // this will be the message for real time chatting ...
+      content: message,
+      attachments: [],
+      _id: v4(), // generate a random _id temprary
+      sender: {
+        _id: user._id,
+        name: user.name,
         chat: chatid,
-        status,
-      };
+        createdAt: new Date().toISOString(),
+      },
+      createdAt: new Date().toISOString(),
+    };
 
-      try {
-        await Message.create(messageForDb);
-      } catch (err) {
-        console.log("Error while saving message to db:", err);
-      }
+    const messageForDb = {
+      // this format of message will save in our Message model
+      content: message,
+      attachments: [],
+      sender: user._id,
+      chat: chatid,
+    };
 
-      const membersSockets = members.map((user) =>
-        userSocketIds.get(user._id.toString())
-      ); // will get all the socketIds of a sepecific chat's members to whom we need to send the message ...
-
-      io.to(membersSockets).emit(NEW_MESSAGE, {
-        chatid,
-        message: messageForRealTime,
-      });
-      io.to(membersSockets).emit(NEW_MESSAGE_ALERT, {
-        chatid,
-        message: messageForRealTime,
-      });
+    try {
+      await Message.create(messageForDb);
+    } catch (err) {
+      console.log("Error while saving message to db:", err);
     }
-  );
+
+
+    let membersSockets = [];
+
+    for (let i = 0; i < members.length; i++) {
+      if (userSocketIds.has(members[i]._id.toString())) {
+        membersSockets.push(userSocketIds.get(members[i]._id.toString()));
+      }
+    }
+
+    io.to(membersSockets).emit(NEW_MESSAGE, {
+      chatId: chatid,
+      message: messageForRealTime,
+    });
+
+    io.to(membersSockets).emit(NEW_MESSAGE_ALERT, {
+      chatid,
+      message: messageForRealTime,
+    });
+  });
 
   socket.on(START_TYPING, ({ filteredMembers, chatid, username }) => {
     const membersSockets = filteredMembers.map((member) =>
@@ -183,21 +185,18 @@ io.on("connection", async (socket) => {
     io.to(membersSockets).emit(STOP_TYPING, { chatid });
   });
 
-
-
   socket.on(CHAT_JOINED, async ({ userId, members, chatid }) => {
     chatOnlineUsers.set(`${userId.toString()}`, chatid);
     const membersSockets = members.map((member) =>
       userSocketIds.get(member._id.toString())
     );
-await updateChatMessagesToSeen(userId, chatid, members, io)
- const chatOnlineUsersObj = Object.fromEntries(chatOnlineUsers.entries());
+    const chatOnlineUsersObj = Object.fromEntries(chatOnlineUsers.entries());
     io.to(membersSockets).emit(CHAT_ONLINE_USERS, {
       chatOnlineMembers: chatOnlineUsersObj,
     });
   });
 
-  socket.on(CHAT_LEAVE, ({ userId, members, chatid }) => {
+  socket.on(CHAT_LEAVE, async({ userId, members, chatid }) => {
     chatOnlineUsers.delete(userId.toString());
 
     const membersSockets = members.map((member) =>
@@ -209,12 +208,15 @@ await updateChatMessagesToSeen(userId, chatid, members, io)
     });
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
+      await updateLastSeen(user, io);
     userSocketIds.delete(user._id.toString());
     onlineUsers.delete(user._id.toString());
     chatOnlineUsers.delete(user._id.toString());
     io.emit(ONLINE_USERS, Array.from(onlineUsers));
-    socket.broadcast.emit(CHAT_ONLINE_USERS, {chatOnlineMembers : Object.fromEntries(chatOnlineUsers.entries())});
+    socket.broadcast.emit(CHAT_ONLINE_USERS, {
+      chatOnlineMembers: Object.fromEntries(chatOnlineUsers.entries()),
+    });
 
     userSocketIds.delete(user._id.toString()); // will remove members from map once they dissconnected ...
     console.log("user dissconnected");

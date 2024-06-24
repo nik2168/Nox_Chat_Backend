@@ -599,7 +599,7 @@ const getChatDetails = async (req, res) => {
     if (req.query.populate === "true") {
       // will send members with name and avatar
       const chat = await Chat.findById(req.params.id)
-        .populate("members", "name avatar")
+        .populate("members")
         .lean();
 
       if (!chat)

@@ -326,7 +326,8 @@ const acceptFriendRequest = async (req, res) => {
         .json({ success: true, message: "request rejected !" });
     }
 
-    const members = [request.sender._id, request.receiver._id]; // members will be user itself and the req sender
+    const members = [request.sender._id, request.receiver._id]; // members will be user itself and the req sende
+
  
     await Promise.all([
       Chat.create({
