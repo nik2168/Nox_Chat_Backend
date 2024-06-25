@@ -29,6 +29,7 @@ const {
   CHAT_LEAVE,
   ONLINE_USERS,
   CHAT_ONLINE_USERS,
+  SCHEDULE_MESSAGE,
 } = require("./constants/events.js");
 const Message = require("./models/message.model.js");
 const { socketAuthenticator } = require("./middlewares/auth.mw.js");
@@ -119,6 +120,8 @@ io.on("connection", async (socket) => {
 
   await updateLastSeen(user, io);
 
+
+
   socket.on(NEW_MESSAGE, async ({ message, chatid, members, otherMember }) => {
     // we got this data from frontend for each chat
 
@@ -170,6 +173,67 @@ io.on("connection", async (socket) => {
       message: messageForRealTime,
     });
   });
+
+  socket.on(
+    SCHEDULE_MESSAGE,
+    async ({ message, chatid, members, otherMember, scheduleTime }) => {
+      // we got this data from frontend for each chat
+
+      const messageForRealTime = {
+        // this will be the message for real time chatting ...
+        content: message,
+        attachments: [],
+        _id: v4(), // generate a random _id temprary
+        sender: {
+          _id: user._id,
+          name: user.name,
+          chat: chatid,
+          createdAt: new Date().toISOString(),
+        },
+        createdAt: new Date().toISOString(),
+      };
+
+      const messageForDb = {
+        // this format of message will save in our Message model
+        content: message,
+        attachments: [],
+        sender: user._id,
+        chat: chatid,
+      };
+
+      const time = scheduleTime * 1000 * 60;
+
+      setTimeout(async () => {
+        try {
+          await Message.create(messageForDb);
+        } catch (err) {
+          console.log("Error while saving message to db:", err);
+        }
+
+        let membersSockets = [];
+
+        for (let i = 0; i < members.length; i++) {
+          if (userSocketIds.has(members[i]._id.toString())) {
+            membersSockets.push(userSocketIds.get(members[i]._id.toString()));
+          }
+        }
+
+        io.to(membersSockets).emit(NEW_MESSAGE, {
+          chatId: chatid,
+          message: messageForRealTime,
+        });
+
+        io.to(membersSockets).emit(NEW_MESSAGE_ALERT, {
+          chatid,
+          message: messageForRealTime,
+        });
+      }, time);
+    }
+  );
+
+
+
+
 
   socket.on(START_TYPING, ({ filteredMembers, chatid, username }) => {
     const membersSockets = filteredMembers.map((member) =>
