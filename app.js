@@ -156,15 +156,6 @@ io.on("connection", async (socket) => {
     }
 
 
-    let membersSockets = [];
-
-    for (let i = 0; i < members.length; i++) {
-      if (userSocketIds.has(members[i]._id.toString())) {
-        membersSockets.push(userSocketIds.get(members[i]._id.toString()));
-      }
-    }
-
-
     io.emit(NEW_MESSAGE, {
       chatId: chatid,
       message: messageForRealTime,
@@ -211,13 +202,13 @@ io.on("connection", async (socket) => {
           console.log("Error while saving message to db:", err);
         }
 
-        let membersSockets = [];
+        // let membersSockets = [];
 
-        for (let i = 0; i < members.length; i++) {
-          if (userSocketIds.has(members[i]._id.toString())) {
-            membersSockets.push(userSocketIds.get(members[i]._id.toString()));
-          }
-        }
+        // for (let i = 0; i < members.length; i++) {
+        //   if (userSocketIds.has(members[i]._id.toString())) {
+        //     membersSockets.push(userSocketIds.get(members[i]._id.toString()));
+        //   }
+        // }
 
         io.emit(NEW_MESSAGE, {
           chatId: chatid,
