@@ -110,7 +110,7 @@ io.on("connection", async (socket) => {
   // will get all the users currently connected to socket
   // temp user
 
-  userSocketIds.set(user._id.toString(), socket.id); // all the socket connected users are in this map
+  if (!userSocketIds.get(user._id.toString())) userSocketIds.set(user._id.toString(), socket.id); // all the socket connected users are in this map
 
 
   console.log("a user connected", socket.id);
@@ -236,14 +236,14 @@ io.on("connection", async (socket) => {
     // const membersSockets = filteredMembers.map((member) =>
     //   userSocketIds.get(member._id.toString())
     // );
-    io.emit(START_TYPING, { chatid, username });
+    io.emit(START_TYPING, { chatid, username, filteredMembers });
   });
 
   socket.on(STOP_TYPING, ({ filteredMembers, chatid }) => {
     // const membersSockets = filteredMembers.map((member) =>
     //   userSocketIds.get(member._id.toString())
     // );
-    io.emit(STOP_TYPING, { chatid });
+    io.emit(STOP_TYPING, { chatid, filteredMembers });
   });
 
   socket.on(CHAT_JOINED, async ({ userId, members, chatid }) => {
