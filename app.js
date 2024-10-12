@@ -110,7 +110,9 @@ io.on("connection", async (socket) => {
   // will get all the users currently connected to socket
   // temp user
 
+  if(!userSocketIds.get(user._id.toString())){
   userSocketIds.set(user._id.toString(), socket.id); // all the socket connected users are in this map
+  }
 
   console.log("a user connected", socket.id);
 
@@ -118,7 +120,7 @@ io.on("connection", async (socket) => {
 
   io.emit(ONLINE_USERS, Array.from(onlineUsers));
 
-  await updateLastSeen(user, io);
+  // await updateLastSeen(user, io);
 
 
 
@@ -163,20 +165,19 @@ io.on("connection", async (socket) => {
       }
     }
 
-    io.to(membersSockets).emit(NEW_MESSAGE, {
+
+    io.emit(NEW_MESSAGE, {
       chatId: chatid,
       message: messageForRealTime,
     });
 
-    io.to(membersSockets).emit(NEW_MESSAGE_ALERT, {
+    io.emit(NEW_MESSAGE_ALERT, {
       chatid,
       message: messageForRealTime,
     });
   });
 
-  socket.on(
-    SCHEDULE_MESSAGE,
-    async ({ message, chatid, members, otherMember, scheduleTime }) => {
+  socket.on(SCHEDULE_MESSAGE, async ({ message, chatid, members, otherMember, scheduleTime }) => {
       // we got this data from frontend for each chat
 
       const messageForRealTime = {
@@ -230,10 +231,6 @@ io.on("connection", async (socket) => {
       }, time);
     }
   );
-
-
-
-
 
   socket.on(START_TYPING, ({ filteredMembers, chatid, username }) => {
     const membersSockets = filteredMembers.map((member) =>
