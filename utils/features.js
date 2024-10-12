@@ -31,7 +31,9 @@ const emitEvent = (req, event, users, data) => {
 
   const usersSocket = users.map((user) => userSocketIds.get(user.toString()));
 
-  io.to(usersSocket).emit(event, data);
+  if(!users.length)
+  io.emit(event, data);
+else io.to(usersSocket).emit(event, data);
   return;
 };
 

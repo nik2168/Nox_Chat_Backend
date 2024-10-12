@@ -282,7 +282,7 @@ const sendFriendRequest = async (req, res) => {
       receiver: userId,
     });
 
-    emitEvent(req, NEW_REQUEST, [userId]);
+    emitEvent(req, NEW_REQUEST, [], userId);
 
     res
       .status(200)
@@ -339,7 +339,7 @@ const acceptFriendRequest = async (req, res) => {
       request.deleteOne(), // will delete the request at the end
     ]);
 
-    emitEvent(req, REFETCH_CHATS, members); // refetch the chats of user
+    emitEvent(req, REFETCH_CHATS, [], members); // refetch the chats of user
 
     return res.status(200).json({
       // finally you know what this is ...... ain't you?

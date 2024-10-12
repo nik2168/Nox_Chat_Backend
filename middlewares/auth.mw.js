@@ -5,8 +5,7 @@ const { ErrorHandler } = require("../utils/utility");
 
 const isAuthenticate = (req, res, next) => {
   try {
-    const token =
-      req.cookies[process.env.TOKEN_NAME];
+    const token = req.cookies[process.env.TOKEN_NAME];
 
     // If there is no token
     if (!token)
@@ -59,8 +58,7 @@ const socketAuthenticator = async (err, socket, next) => {
   try {
     if (err) return next(err);
 
-    const authToken =
-      socket.request.cookies[process.env.TOKEN_NAME];
+    const authToken = socket.request.cookies[process.env.TOKEN_NAME];
 
     if (!authToken)
       return next(new ErrorHandler("Please login to access this route", 401));

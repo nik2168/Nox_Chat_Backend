@@ -326,9 +326,10 @@ const removeMembers = async (req, res) => {
 
     const removedMemberId = remove_members[0];
 
-    emitEvent(req, MEMBER_REMOVED, allChatMembers, {
+    emitEvent(req, MEMBER_REMOVED, [], {
       curChatId: chatId.toString(),
       userId: removedMemberId.toString(),
+      allChatMembers,
     });
 
     return res
@@ -498,12 +499,12 @@ const sendAttachments = async (req, res) => {
 
     const message = await Message.create(messageForDb);
 
-    emitEvent(req, NEW_MESSAGE, chat?.members, {
+    emitEvent(req, NEW_MESSAGE, [], {
+      chatId: chatId,
       message: messageForRealTime,
-      chatid: chatId,
     });
 
-    emitEvent(req, NEW_MESSAGE_ALERT, chat?.members, { chatid : chatId, message: "ATTACHMENT" });
+    emitEvent(req, NEW_MESSAGE_ALERT, [], { chatid : chatId, message: "ATTACHMENT" });
 
     res.status(201).json({
       success: true,
