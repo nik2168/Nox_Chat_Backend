@@ -219,14 +219,15 @@ io.on("connection", async (socket) => {
           }
         }
 
-        io.to(membersSockets).emit(NEW_MESSAGE, {
+        io.emit(NEW_MESSAGE, {
           chatId: chatid,
           message: messageForRealTime,
         });
 
-        io.to(membersSockets).emit(NEW_MESSAGE_ALERT, {
+        io.emit(NEW_MESSAGE_ALERT, {
           chatid,
           message: messageForRealTime,
+          members,
         });
       }, time);
     }
@@ -236,6 +237,7 @@ io.on("connection", async (socket) => {
     // const membersSockets = filteredMembers.map((member) =>
     //   userSocketIds.get(member._id.toString())
     // );
+
     io.emit(START_TYPING, { chatid, username, filteredMembers });
   });
 
@@ -247,6 +249,7 @@ io.on("connection", async (socket) => {
   });
 
   socket.on(CHAT_JOINED, async ({ userId, members, chatid }) => {
+
     chatOnlineUsers.set(`${userId.toString()}`, chatid);
     const membersSockets = members.map((member) =>
       userSocketIds.get(member._id.toString())
