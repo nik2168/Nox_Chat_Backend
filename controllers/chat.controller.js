@@ -460,10 +460,10 @@ const sendAttachments = async (req, res) => {
       });
     }
 
-      const [chat, user] = await Promise.all([
-    Chat.findById(chatId),
-    User.findById(req.userId, "name"),
-  ]);
+    const [chat, user] = await Promise.all([
+      Chat.findById(chatId),
+      User.findById(req.userId, "name"),
+    ]);
 
     if (!chat)
       return res.status(400).json({
@@ -504,7 +504,10 @@ const sendAttachments = async (req, res) => {
       message: messageForRealTime,
     });
 
-    emitEvent(req, NEW_MESSAGE_ALERT, [], { chatid : chatId, message: "ATTACHMENT" });
+    emitEvent(req, NEW_MESSAGE_ALERT, [], {
+      chatid: chatId,
+      message: "ATTACHMENT",
+    });
 
     res.status(201).json({
       success: true,
@@ -530,70 +533,63 @@ const sendAttachments = async (req, res) => {
 };
 
 const getChatProfileData = async (req, res) => {
-const chatId = req.params.id
+  const chatId = req.params.id;
 
   try {
-      const chat = await Chat.findById(chatId)
-        .populate("members", "name avatar")
-        .lean();
+    const chat = await Chat.findById(chatId)
+      .populate("members", "name avatar")
+      .lean();
 
-      if (!chat)
-        res.status(400).json({ success: false, message: "chat not found" });
+    if (!chat)
+      res.status(400).json({ success: false, message: "chat not found" });
 
-      const curChatMembers = chat.members.map((i) => i._id.toString());
+    const curChatMembers = chat.members.map((i) => i._id.toString());
 
-      if (!curChatMembers.includes(req.userId.toString())) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "you are not a member of this group",
-          });
-      }
+    if (!curChatMembers.includes(req.userId.toString())) {
+      return res.status(400).json({
+        success: false,
+        message: "you are not a member of this group",
+      });
+    }
 
-      let profileData;
+    let profileData;
 
-      if(!chat.groupChat){
+    if (!chat.groupChat) {
+      const othermember = chat.members.find(
+        (i) => i._id.toString() !== req.userId.toString()
+      );
 
-        const othermember = chat.members.find((i) => i._id.toString() !== req.userId.toString())
-       
-        const otherUser = await User.find({_id : othermember._id})
-        profileData = otherUser[0]
-     
-      }
-      else{
-        profileData = {
-          _id: chat._id,
-          avatar: chat.avatar,
-          createdAt: chat.createdAt,
-          name: chat.name,
-          creator: chat.creator,
-        }
-      }
+      const otherUser = await User.find({ _id: othermember._id });
+      profileData = otherUser[0];
+    } else {
+      profileData = {
+        _id: chat._id,
+        avatar: chat.avatar,
+        createdAt: chat.createdAt,
+        name: chat.name,
+        creator: chat.creator,
+      };
+    }
 
-
-      return res.status(200).json({ success: true,  profileData });
-
+    return res.status(200).json({ success: true, profileData });
   } catch (err) {
-       if (err.name === "CastError") {
-         const path = err.path;
-         err.message = `Invalid format of ${path}`;
+    if (err.name === "CastError") {
+      const path = err.path;
+      err.message = `Invalid format of ${path}`;
 
-         return res.status(400).json({
-           success: false,
-           message: process.env.NODE_ENV === "DEVELOPMENT" ? err : err.message,
-         });
-       }
+      return res.status(400).json({
+        success: false,
+        message: process.env.NODE_ENV === "DEVELOPMENT" ? err : err.message,
+      });
+    }
 
     return res.status(400).json({
       success: false,
       message: "error while fetching chat profile details",
       Error: err,
     });
-
   }
 };
-
 
 const getChatDetails = async (req, res) => {
   try {
@@ -604,17 +600,15 @@ const getChatDetails = async (req, res) => {
         .lean();
 
       if (!chat)
-        res.status(400).json({ success: false, message: "chat not found" });
+       return res.status(400).json({ success: false, message: "chat not found" });
 
       const curChatMembers = chat.members.map((i) => i._id.toString());
 
       if (!curChatMembers.includes(req.userId.toString())) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "you are not a member of this group",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "you are not a member of this group",
+        });
       }
 
       return res.status(200).json({ success: true, curchat: chat });
@@ -630,12 +624,10 @@ const getChatDetails = async (req, res) => {
         });
 
       if (!chat.members.includes(req.userId.toString())) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "you are not a member of this group",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "you are not a member of this group",
+        });
       }
 
       return res.status(200).json({ success: true, curchat: chat });
@@ -803,13 +795,11 @@ const deleteChat = async (req, res) => {
     //   "Guys the group is deleted by that stupid admin!"
     // );
 
-    emitEvent(req, REFETCH_CHATS, members);
-
+    emitEvent(req, REFETCH_CHATS, [], members);
 
     return res
       .status(201)
       .json({ success: true, message: "Group deleted successfully!" });
-      
   } catch (err) {
     if (err.name === "CastError") {
       const path = err.path;
@@ -833,7 +823,6 @@ const getMessages = async (req, res) => {
   const chatId = req.params.id;
 
   try {
-
     const { page = 1 } = req.query;
 
     const limit = 20;
@@ -877,7 +866,7 @@ const getMessages = async (req, res) => {
 
     const totalPages = Math.ceil(totalMessagesCount / limit) || 0; // math ceil will roundoff the value
 
-   return  res
+    return res
       .status(200)
       .json({ success: true, messages: messages.reverse(), totalPages });
   } catch (err) {
@@ -903,7 +892,6 @@ const getLastMessageTime = async (req, res) => {
   const chatId = req.params.id;
 
   try {
-
     const { page = 1 } = req.query;
 
     const limit = 20;
@@ -948,12 +936,11 @@ const getLastMessageTime = async (req, res) => {
     const totalPages = Math.ceil(totalMessagesCount / limit) || 0; // math ceil will roundoff the value
 
     // const transformMessages = messages.reverse()
-    const lastMsg = messages[0]
+    const lastMsg = messages[0];
 
-   return  res
+    return res
       .status(200)
       .json({ success: true, lastMessage: lastMsg, totalPages });
-      
   } catch (err) {
     if (err.name === "CastError") {
       const path = err.path;
@@ -973,72 +960,108 @@ const getLastMessageTime = async (req, res) => {
   }
 };
 
-
 const changeMessagesToOnline = async (req, res) => {
+  try {
+    const myChats = await Chat.find({ members: req.userId, groupChat: false })
+      .populate("members")
+      .lean();
+    const myChatsIds = myChats.map((chat) => {
+      return chat._id;
+    });
 
+    const allMembers = myChats
+      .map((chat) => {
+        return chat.members.filter(
+          (member) => member._id.toString() !== req.userId.toString()
+        );
+      })
+      .flat();
 
-try{
+    const members = allMembers.map((member) => {
+      return member._id;
+    });
 
-  const myChats = await Chat.find({members: req.userId, groupChat: false}).populate('members').lean()
-  const myChatsIds = myChats.map((chat) => {
-    return chat._id
-  })
+    const messagesPromise = myChatsIds.map((curId) => {
+      const messages = Message.updateMany(
+        {
+          chat: curId,
+          status: "send",
+          sender: { $nin: req.userId.toString() },
+        },
+        { $set: { status: "online" } }
+      );
+      return messages;
+    });
 
-  const allMembers = myChats.map((chat) => {
-    return chat.members.filter((member) => member._id.toString() !== req.userId.toString())
-  }).flat()
-
-  const members = allMembers.map((member) => {
-    return member._id
-  })
-
-const messagesPromise = myChatsIds.map((curId) => {
-  const messages =  Message.updateMany({chat: curId, status: "send", sender: { $nin: req.userId.toString()}}, { $set: {status: "online"}})
-  return messages
-})
-
-const resolvedPromise = await Promise.all(messagesPromise)
+    const resolvedPromise = await Promise.all(messagesPromise);
 
     emitEvent(req, REFETCH_MESSAGES, members, "online");
 
-return res.status(201).json({success: true, message: "messages's status changed from send to online successfully !", myChatsIds, members, userId: req.userId})
-
-}catch(err){ 
-  return res.status(400).json({success: false, message: "Error while changing the message status to online"})
-}
-
-}
-
+    return res
+      .status(201)
+      .json({
+        success: true,
+        message: "messages's status changed from send to online successfully !",
+        myChatsIds,
+        members,
+        userId: req.userId,
+      });
+  } catch (err) {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "Error while changing the message status to online",
+      });
+  }
+};
 
 const changeMessagesToSeen = async (req, res) => {
-    const chatId = req.params.id
+  const chatId = req.params.id;
 
-try{
-const messages = await Message.updateMany(
-  {chat: chatId, status: "online", sender: {$nin: req.userId.toString()}},
-  {
-    $set: {
-      status: "seen",
-    },
-  },
-);
+  try {
+    const messages = await Message.updateMany(
+      {
+        chat: chatId,
+        status: "online",
+        sender: { $nin: req.userId.toString() },
+      },
+      {
+        $set: {
+          status: "seen",
+        },
+      }
+    );
 
-const curChat = await Chat.findById(chatId).populate("members").lean()
-const allMembers = curChat.members.filter((member) => member._id.toString() !== req.userId.toString())
-const members = allMembers.map((member) => {
-  return member._id
-}).flat()
+    const curChat = await Chat.findById(chatId).populate("members").lean();
+    const allMembers = curChat.members.filter(
+      (member) => member._id.toString() !== req.userId.toString()
+    );
+    const members = allMembers
+      .map((member) => {
+        return member._id;
+      })
+      .flat();
 
     emitEvent(req, REFETCH_MESSAGES, members, "seen");
 
-
-return res.status(200).json({success: true, message: "messages's status changed from online to seen successfully !", messages, members})
-
-}catch(err){ 
-  return res.status(400).json({success: false, message: "Error while changing the message status to online"})
-}
-
-}
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "messages's status changed from online to seen successfully !",
+        messages,
+        members,
+      });
+  } catch (err) {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "Error while changing the message status to online",
+      });
+  }
+};
 
 module.exports = {
   newGroupChat,
