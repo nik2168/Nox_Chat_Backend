@@ -54,7 +54,7 @@ const newGroupChat = async (req, res) => {
 
     emitEvent(req, ALERT, allMembers, `Welcome to ${name} group !`);
 
-    emitEvent(req, REFETCH_CHATS, members);
+    emitEvent(req, REFETCH_CHATS, [], members);
 
     return res.status(201).json({ success: true, message: "group  created !" });
   } catch (err) {
@@ -184,10 +184,13 @@ const addMembers = async (req, res) => {
     const admin = await User.findById(req.userId);
 
     // message for real time
+    let tempId = v4();
+
     const messageForRealTime = {
       content: `${allMembersName} added by ${admin.name}`,
       attachments: [],
-      _id: v4(),
+      _id: tempId,
+      tempId,
       isAlert: true,
       sender: {
         _id: admin._id,
@@ -197,8 +200,8 @@ const addMembers = async (req, res) => {
       },
     };
 
-    emitEvent(req, NEW_MESSAGE, curGroup.members, {
-      chatid: chatId,
+    emitEvent(req, NEW_MESSAGE, [], {
+      chatId,
       message: messageForRealTime,
     });
 
@@ -207,10 +210,11 @@ const addMembers = async (req, res) => {
       sender: req.adminId,
       content: `${allMembersName} added by ${admin.name}`,
       isAlert: true,
+      tempId,
       chat: chatId,
     });
 
-    emitEvent(req, REFETCH_CHATS, curGroup.members);
+    emitEvent(req, REFETCH_CHATS, [], curGroup.members);
 
     return res
       .status(200)
@@ -298,10 +302,12 @@ const removeMembers = async (req, res) => {
     const admin = await User.findById(req.userId);
 
     // message for real time
+    let tempId = v4();
     const messageForRealTime = {
       content: `${allMembersName} removed from the group by ${admin.name}`,
       attachments: [],
-      _id: v4(),
+      _id: tempId,
+      tempId,
       isAlert: true,
       sender: {
         _id: admin._id,
@@ -311,8 +317,8 @@ const removeMembers = async (req, res) => {
       },
     };
 
-    emitEvent(req, NEW_MESSAGE, allChatMembers, {
-      chatid: chatId,
+    emitEvent(req, NEW_MESSAGE, [], {
+      chatId: chatId,
       message: messageForRealTime,
     });
 
@@ -321,6 +327,7 @@ const removeMembers = async (req, res) => {
       sender: req.userId,
       content: `${allMembersName} removed by ${admin.name}`,
       isAlert: true,
+      tempId,
       chat: chatId,
     });
 
@@ -392,13 +399,17 @@ const leaveGroup = async (req, res) => {
     const admin = await User.findById(req.userId);
 
     // message for real time
+
+    let tempId = v4();
+
     const messageForRealTime = {
       content: `${admin.name} left the group, ${
         curGroup.creator.toString() === req.userId.toString() &&
         "new random admin will be selected from rest of the group members !"
       }`,
       attachments: [],
-      _id: v4(),
+      _id: tempId,
+      tempId,
       isAlert: true,
       sender: {
         _id: admin._id,
@@ -408,8 +419,8 @@ const leaveGroup = async (req, res) => {
       },
     };
 
-    emitEvent(req, NEW_MESSAGE, curGroup.members, {
-      chatid: chatId,
+    emitEvent(req, NEW_MESSAGE, [], {
+      chatId: chatId,
       message: messageForRealTime,
     });
 
@@ -418,10 +429,11 @@ const leaveGroup = async (req, res) => {
       sender: req.userId,
       content: `${leftUser.name} left the group `,
       isAlert: true,
+      tempId,
       chat: chatId,
     });
 
-    emitEvent(req, REFETCH_CHATS, curGroup.members);
+    emitEvent(req, REFETCH_CHATS, [], curGroup.members);
 
     return res.status(200).json({
       success: true,
@@ -479,9 +491,11 @@ const sendAttachments = async (req, res) => {
     // upload file here
 
     const attachments = await uploadFilesToCloudinary(files);
-
+    let tempId = v4();
     const messageForRealTime = {
-      content: "",
+      _id: tempId,
+      tempId,
+      content: "send new attachment",
       attachments,
       chat: chatId,
       sender: {
@@ -493,6 +507,7 @@ const sendAttachments = async (req, res) => {
     const messageForDb = {
       content: "",
       attachments,
+      tempId,
       chat: chatId,
       sender: user._id,
     };
@@ -506,7 +521,7 @@ const sendAttachments = async (req, res) => {
 
     emitEvent(req, NEW_MESSAGE_ALERT, [], {
       chatid: chatId,
-      message: "ATTACHMENT",
+      message: messageForRealTime,
     });
 
     res.status(201).json({
@@ -600,7 +615,9 @@ const getChatDetails = async (req, res) => {
         .lean();
 
       if (!chat)
-       return res.status(400).json({ success: false, message: "chat not found" });
+        return res
+          .status(400)
+          .json({ success: false, message: "chat not found" });
 
       const curChatMembers = chat.members.map((i) => i._id.toString());
 
@@ -689,10 +706,13 @@ const updateGroupInfo = async (req, res) => {
     const admin = await User.findById(req.userId);
 
     // message for real time
+    let tempId = v4();
+
     const messageForRealTime = {
-      content: `${admin.name} changed the group profile picture & name `,
+      content: `${admin.name} changed the group profile picture & name to ${name} `,
       attachments: [],
-      _id: v4(),
+      _id: tempId,
+      tempId,
       isAlert: true,
       sender: {
         _id: admin._id,
@@ -702,20 +722,21 @@ const updateGroupInfo = async (req, res) => {
       },
     };
 
-    emitEvent(req, NEW_MESSAGE, curGroup.members, {
-      chatid: chatId,
+    emitEvent(req, NEW_MESSAGE, [], {
+      chatId: chatId,
       message: messageForRealTime,
     });
 
     // message for db
     await Message.create({
       sender: req.userId,
+      tempId,
       content: `${admin.name} changed the group profile picture & name`,
       isAlert: true,
       chat: chatId,
     });
 
-    emitEvent(req, REFETCH_CHATS, curGroup.members);
+    emitEvent(req, REFETCH_CHATS, [], curGroup.members);
 
     res
       .status(201)
@@ -997,22 +1018,18 @@ const changeMessagesToOnline = async (req, res) => {
 
     emitEvent(req, REFETCH_MESSAGES, members, "online");
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "messages's status changed from send to online successfully !",
-        myChatsIds,
-        members,
-        userId: req.userId,
-      });
+    return res.status(201).json({
+      success: true,
+      message: "messages's status changed from send to online successfully !",
+      myChatsIds,
+      members,
+      userId: req.userId,
+    });
   } catch (err) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Error while changing the message status to online",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Error while changing the message status to online",
+    });
   }
 };
 
@@ -1045,21 +1062,17 @@ const changeMessagesToSeen = async (req, res) => {
 
     emitEvent(req, REFETCH_MESSAGES, members, "seen");
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "messages's status changed from online to seen successfully !",
-        messages,
-        members,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "messages's status changed from online to seen successfully !",
+      messages,
+      members,
+    });
   } catch (err) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Error while changing the message status to online",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Error while changing the message status to online",
+    });
   }
 };
 

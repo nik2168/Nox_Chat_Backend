@@ -1,4 +1,4 @@
-const { Schema, Types, model, models } =  require("mongoose");
+const { Schema, Types, model, models } = require("mongoose");
 
 const messageSchema = new Schema(
   {
@@ -15,6 +15,26 @@ const messageSchema = new Schema(
           type: String,
           required: true,
         },
+      },
+    ],
+    tempId: {
+      type:String,
+      required: true,
+      unique: true,
+    },
+    isPoll: {
+      type: Boolean,
+      default: false,
+    },
+    options: [
+      {
+        content: {
+          type: String,
+        },
+        members: [ {
+          type: Types.ObjectId,
+          ref: "User",
+        }],
       },
     ],
     isAlert: {
@@ -44,4 +64,4 @@ const messageSchema = new Schema(
 );
 
 const Message = models.Message || model("Message", messageSchema);
-module.exports = Message
+module.exports = Message;

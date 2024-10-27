@@ -30,14 +30,12 @@ const {
   ONLINE_USERS,
   CHAT_ONLINE_USERS,
   SCHEDULE_MESSAGE,
+  UPDATE_POLL,
 } = require("./constants/events.js");
 const Message = require("./models/message.model.js");
 const { socketAuthenticator } = require("./middlewares/auth.mw.js");
 const { errorMiddleWare } = require("./middlewares/error.mw.js");
-const {
-  userSocketIds,
-  updateLastSeen,
-} = require("./utils/features.js");
+const { userSocketIds, updateLastSeen } = require("./utils/features.js");
 const onlineUsers = new Set();
 const chatOnlineUsers = new Map();
 const server = createServer(app);
@@ -110,8 +108,8 @@ io.on("connection", async (socket) => {
   // will get all the users currently connected to socket
   // temp user
 
-  if (!userSocketIds.get(user._id.toString())) userSocketIds.set(user._id.toString(), socket.id); // all the socket connected users are in this map
-
+  if (!userSocketIds.get(user._id.toString()))
+    userSocketIds.set(user._id.toString(), socket.id); // all the socket connected users are in this map
 
   console.log("a user connected", socket.id);
 
@@ -121,54 +119,86 @@ io.on("connection", async (socket) => {
 
   // await updateLastSeen(user, io);
 
+  socket.on(
+    NEW_MESSAGE,
+    async ({ message, chatid, members, isPoll, options, otherMember }) => {
+      // we got this data from frontend for each chat
 
+      const tempId = v4();
 
-  socket.on(NEW_MESSAGE, async ({ message, chatid, members, otherMember }) => {
-    // we got this data from frontend for each chat
-
-
-    const messageForRealTime = {
-      // this will be the message for real time chatting ...
-      content: message,
-      attachments: [],
-      _id: v4(), // generate a random _id temprary
-      sender: {
-        _id: user._id,
-        name: user.name,
-        chat: chatid,
+      const messageForRealTime = {
+        // this will be the message for real time chatting ...
+        content: message,
+        attachments: [],
+        _id: tempId, // generate a random _id temprary
+        tempId,
+        isPoll: isPoll || false,
+        options: options || [],
+        sender: {
+          _id: user._id,
+          name: user.name,
+          chat: chatid,
+          createdAt: new Date().toISOString(),
+        },
         createdAt: new Date().toISOString(),
-      },
-      createdAt: new Date().toISOString(),
-    };
+      };
 
-    const messageForDb = {
-      // this format of message will save in our Message model
-      content: message,
-      attachments: [],
-      sender: user._id,
-      chat: chatid,
-    };
+      const messageForDb = {
+        // this format of message will save in our Message model
+        content: message,
+        attachments: [],
+        isPoll: isPoll || false,
+        options: options || [],
+        sender: user._id,
+        chat: chatid,
+        tempId,
+      };
 
-    try {
-      await Message.create(messageForDb);
-    } catch (err) {
-      console.log("Error while saving message to db:", err);
+      try {
+        await Message.create(messageForDb);
+      } catch (err) {
+        console.log("Error while saving message to db:", err);
+      }
+
+      io.emit(NEW_MESSAGE, {
+        chatId: chatid,
+        message: messageForRealTime,
+      });
+
+      io.emit(NEW_MESSAGE_ALERT, {
+        chatid,
+        message: messageForRealTime,
+        members,
+      });
     }
+  );
 
-
-    io.emit(NEW_MESSAGE, {
-      chatId: chatid,
-      message: messageForRealTime,
+  socket.on(UPDATE_POLL, async ({ tempId, optionId, userId, chatId }) => {
+    try{
+    const messageData = await Message.findOne({tempId: tempId});
+    let idx = 0;
+    messageData.options.map((option, i) => {
+      if (option._id.toString() === optionId.toString()) {
+        idx = i;
+      }
+      option.members = option.members.filter((i) => i != userId);
     });
+    if (!messageData.options[idx].members.includes(userId.toString())) {
+      messageData.options[idx].members.push(userId.toString());
+    }
+    await messageData.save();
+      io.emit(UPDATE_POLL, { tempId, messageData, chatId, userId });
 
-    io.emit(NEW_MESSAGE_ALERT, {
-      chatid,
-      message: messageForRealTime,
-      members,
-    });
+  }catch(error){
+    console.log("Error while updating the poll !", error);
+  }
+
+
   });
 
-  socket.on(SCHEDULE_MESSAGE, async ({ message, chatid, members, otherMember, scheduleTime }) => {
+  socket.on(
+    SCHEDULE_MESSAGE,
+    async ({ message, chatid, members, otherMember, scheduleTime }) => {
       // we got this data from frontend for each chat
 
       const messageForRealTime = {
@@ -240,7 +270,6 @@ io.on("connection", async (socket) => {
   });
 
   socket.on(CHAT_JOINED, async ({ userId, members, chatid }) => {
-
     chatOnlineUsers.set(`${userId.toString()}`, chatid);
     const membersSockets = members.map((member) =>
       userSocketIds.get(member._id.toString())
@@ -252,7 +281,7 @@ io.on("connection", async (socket) => {
     });
   });
 
-  socket.on(CHAT_LEAVE, async({ userId, members, chatid }) => {
+  socket.on(CHAT_LEAVE, async ({ userId, members, chatid }) => {
     chatOnlineUsers.delete(userId.toString());
 
     const membersSockets = members.map((member) =>
@@ -266,7 +295,7 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("disconnect", async () => {
-      await updateLastSeen(user, io);
+    // await updateLastSeen(user, io);
     userSocketIds.delete(user._id.toString());
     onlineUsers.delete(user._id.toString());
     chatOnlineUsers.delete(user._id.toString());
