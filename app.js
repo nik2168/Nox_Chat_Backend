@@ -135,7 +135,8 @@ io.on("connection", async (socket) => {
         isPoll: isPoll || false,
         options: options || [],
         sender: {
-          ...user,
+          _id: user._id,
+          name: user.name,
           chat: chatid,
           createdAt: new Date().toISOString(),
         },
