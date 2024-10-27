@@ -135,8 +135,7 @@ io.on("connection", async (socket) => {
         isPoll: isPoll || false,
         options: options || [],
         sender: {
-          _id: user._id,
-          name: user.name,
+          ...user,
           chat: chatid,
           createdAt: new Date().toISOString(),
         },
@@ -173,28 +172,33 @@ io.on("connection", async (socket) => {
     }
   );
 
-  socket.on(UPDATE_POLL, async ({ tempId, optionId, userId, chatId }) => {
-    try{
-    const messageData = await Message.findOne({tempId: tempId});
-    let idx = 0;
-    messageData.options.map((option, i) => {
-      if (option._id.toString() === optionId.toString()) {
-        idx = i;
+  // update Poll
+  socket.on(
+    UPDATE_POLL,
+    async ({ tempId, optionId, userId, chatId, userData }) => {
+      try {
+        const messageData = await Message.findOne({ tempId: tempId }).populate(
+          "options.members"
+        );
+
+        let idx = 0;
+        // remove user from any other option's members
+        messageData.options.map((option, i) => {
+          if (option._id.toString() === optionId.toString()) {
+            idx = i;
+          }
+          option.members = option.members.filter((i) => i._id != userId);
+        });
+       // push user in current option's members
+        messageData.options[idx].members.push(userData);
+
+        await messageData.save();
+        io.emit(UPDATE_POLL, { tempId, messageData, chatId, userId });
+      } catch (error) {
+        console.log("Error while updating the poll !", error);
       }
-      option.members = option.members.filter((i) => i != userId);
-    });
-    if (!messageData.options[idx].members.includes(userId.toString())) {
-      messageData.options[idx].members.push(userId.toString());
     }
-    await messageData.save();
-      io.emit(UPDATE_POLL, { tempId, messageData, chatId, userId });
-
-  }catch(error){
-    console.log("Error while updating the poll !", error);
-  }
-
-
-  });
+  );
 
   socket.on(
     SCHEDULE_MESSAGE,

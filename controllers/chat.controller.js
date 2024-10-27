@@ -880,6 +880,7 @@ const getMessages = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate("sender", "name avatar")
+        .populate("options.members")
         .lean(),
 
       Message.countDocuments({ chat: chatId }),
