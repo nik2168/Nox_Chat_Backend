@@ -176,22 +176,35 @@ io.on("connection", async (socket) => {
   // update Poll
   socket.on(
     UPDATE_POLL,
-    async ({ tempId, optionId, userId, chatId, userData }) => {
+    async ({ tempId, optionIdx, userId, chatId, userData }) => {
       try {
         const messageData = await Message.findOne({ tempId: tempId }).populate(
           "options.members"
         );
 
-        let idx = 0;
-        // remove user from any other option's members
-        messageData.options.map((option, i) => {
-          if (option._id.toString() === optionId.toString()) {
-            idx = i;
+        // push user in current option's members
+        let ifAlreadyIncludes = false;
+        for (
+          let i = 0;
+          i < messageData.options[optionIdx].members.length;
+          i++
+        ) {
+          if (
+            messageData.options[optionIdx].members[i]._id.toString() ===
+            user._id.toString()
+          ) {
+            messageData.options[optionIdx].members.splice(i, 1);
+            ifAlreadyIncludes = true;
           }
+        }
+
+        // remove user from each option ...
+        if(!ifAlreadyIncludes){
+        messageData.options.map((option, i) => {
           option.members = option.members.filter((i) => i._id != userId);
         });
-       // push user in current option's members
-        messageData.options[idx].members.push(userData);
+        messageData.options[optionIdx].members.push(userData);
+      }
 
         await messageData.save();
         io.emit(UPDATE_POLL, { tempId, messageData, chatId, userId });
