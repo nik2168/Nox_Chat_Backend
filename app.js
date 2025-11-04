@@ -50,7 +50,6 @@ dotenv.config({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
 mongoose
   .connect(process.env.MONGO_URI, { dbName: process.env.name })
   .then(() => {
@@ -200,12 +199,12 @@ io.on("connection", async (socket) => {
         }
 
         // remove user from each option ...
-        if(!ifAlreadyIncludes){
-        messageData.options.map((option, i) => {
-          option.members = option.members.filter((i) => i._id != userId);
-        });
-        messageData.options[optionIdx].members.push(userData);
-      }
+        if (!ifAlreadyIncludes) {
+          messageData.options.map((option, i) => {
+            option.members = option.members.filter((i) => i._id != userId);
+          });
+          messageData.options[optionIdx].members.push(userData);
+        }
 
         await messageData.save();
         io.emit(UPDATE_POLL, { tempId, messageData, chatId, userId });
@@ -289,7 +288,15 @@ io.on("connection", async (socket) => {
   });
 
   socket.on(CHAT_JOINED, async ({ userId, members, chatid }) => {
-    chatOnlineUsers.set(`${userId.toString()}`, chatid);
+    // Use socket.user._id (from authenticated socket) instead of trusting client userId
+    // user is available from the outer scope (socket.user from connection handler)
+    console.log("CHAT_JOINED: userId", userId);
+    const currentUserId = userId ? userId.toString() : user._id.toString();
+    if (!currentUserId) {
+      console.error("CHAT_JOINED: No userId available");
+      return;
+    }
+    chatOnlineUsers.set(currentUserId, chatid);
     const membersSockets = members.map((member) =>
       userSocketIds.get(member._id.toString())
     );
@@ -301,12 +308,17 @@ io.on("connection", async (socket) => {
   });
 
   socket.on(CHAT_LEAVE, async ({ userId, members, chatid }) => {
-    chatOnlineUsers.delete(userId.toString());
+    // Use socket.user._id (from authenticated socket) instead of trusting client userId
+    // user is available from the outer scope (socket.user from connection handler)
+    console.log("CHAT_LEAVE: userId", userId);
+    const currentUserId = userId ? userId.toString() : user._id.toString();
+    if (!currentUserId) {
+      console.error("CHAT_LEAVE: No userId available");
+      return;
+    }
+    chatOnlineUsers.delete(currentUserId);
 
-    const membersSockets = members.map((member) =>
-      userSocketIds.get(member._id.toString())
-    );
-
+    // Also emit globally to ensure all clients update
     io.emit(CHAT_ONLINE_USERS, {
       chatOnlineMembers: Object.fromEntries(chatOnlineUsers.entries()),
       chatId: chatid,

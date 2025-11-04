@@ -40,11 +40,11 @@ const createUser = async (req, res) => {
     // generate a new jwt token
     const token = jwt.sign({ _id: newUser._id }, process.env.secret);
 
-    // If everything is fine then send the jwt token in cookie
+    // If everything is fine then send the jwt token in cookie and response body (for mobile)
     return res
       .status(201)
       .cookie(process.env.TOKEN_NAME, token, cookieObj)
-      .json({ success: true, message: "User Created!", user: newUser });
+      .json({ success: true, message: "User Created!", user: newUser, token });
   } catch (err) {
     if (err.code === 11000) {
       const error = Object.keys(err.keyPattern).join(",");
@@ -83,11 +83,11 @@ const userLogin = async (req, res) => {
     // generate a new jwt token
     const token = jwt.sign({ _id: checkUser._id }, process.env.secret);
 
-    // If everything is fine then send the jwt token in cookie
+    // If everything is fine then send the jwt token in cookie and response body (for mobile)
     return res
       .status(200)
       .cookie(process.env.TOKEN_NAME, token, cookieObj)
-      .json({ success: true, message: "Login Success!", user: checkUser });
+      .json({ success: true, message: "Login Success!", user: checkUser, token });
       
   } catch (err) {
     return res

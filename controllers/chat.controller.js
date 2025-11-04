@@ -76,11 +76,47 @@ const getMyChats = async (req, res) => {
       name: { $regex: queryName, $options: "i" },
     }).populate("members", "name avatar createdAt bio"); // will provide the user details from the members key. ...
 
-    const transformChats = chats.map(
-      ({ _id, name, avatar, groupChat, members }) => {
+    // Get last messages for all chats at once
+    const chatIds = chats.map(chat => chat._id);
+    const lastMessages = await Message.aggregate([
+      { 
+        $match: { 
+          chat: { $in: chatIds } 
+        } 
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$chat",
+          lastMessage: { $first: "$$ROOT" }
+        }
+      }
+    ]);
+
+    // Create a map for quick lookup
+    const lastMessageMap = new Map();
+    lastMessages.forEach(item => {
+      // Convert both to strings for comparison
+      const chatIdStr = item._id.toString();
+      lastMessageMap.set(chatIdStr, item.lastMessage);
+    });
+
+    const transformChats = await Promise.all(
+      chats.map(async ({ _id, name, avatar, groupChat, members, updatedAt }) => {
         const othermember = members.find(
           (i) => i._id.toString() !== req.userId.toString()
         );
+
+        // Get last message for this chat
+        const chatIdStr = _id.toString();
+        const lastMsg = lastMessageMap.get(chatIdStr);
+        let lastMessageContent = null;
+        let lastMessageTime = null;
+
+        if (lastMsg) {
+          lastMessageContent = lastMsg.content || (lastMsg.isPoll ? "Poll" : (lastMsg.attachments?.length > 0 ? "Attachment" : ""));
+          lastMessageTime = lastMsg.createdAt;
+        }
 
         return {
           _id,
@@ -93,10 +129,18 @@ const getMyChats = async (req, res) => {
             }
             return pre;
           }, []),
-          // lastMessage: lastMessage
+          lastMessage: lastMessageContent,
+          updatedAt: lastMessageTime || updatedAt,
         };
-      }
+      })
     );
+
+    // Sort by updatedAt (most recent first)
+    transformChats.sort((a, b) => {
+      const timeA = new Date(a.updatedAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || 0).getTime();
+      return timeB - timeA;
+    });
 
     return res.status(200).json({ success: true, mychats: transformChats });
   } catch (err) {
