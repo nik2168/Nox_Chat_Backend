@@ -37,7 +37,7 @@ const { socketAuthenticator } = require("./middlewares/auth.mw.js");
 const { errorMiddleWare } = require("./middlewares/error.mw.js");
 const { userSocketIds, updateLastSeen } = require("./utils/features.js");
 const onlineUsers = new Set();
-const chatOnlineUsers = new Map();
+const chatOnlineUsers = new Set();
 const server = createServer(app);
 const io = new Server(server, { cors: corsOptions });
 
@@ -296,13 +296,9 @@ io.on("connection", async (socket) => {
       console.error("CHAT_JOINED: No userId available");
       return;
     }
-    chatOnlineUsers.set(currentUserId, chatid);
-    const membersSockets = members.map((member) =>
-      userSocketIds.get(member._id.toString())
-    );
-    const chatOnlineUsersObj = Object.fromEntries(chatOnlineUsers.entries());
+    chatOnlineUsers.add(currentUserId);
     io.emit(CHAT_ONLINE_USERS, {
-      chatOnlineMembers: chatOnlineUsersObj,
+      chatOnlineMembers: Array.from(chatOnlineUsers),
       chatId: chatid,
     });
   });
@@ -320,7 +316,7 @@ io.on("connection", async (socket) => {
 
     // Also emit globally to ensure all clients update
     io.emit(CHAT_ONLINE_USERS, {
-      chatOnlineMembers: Object.fromEntries(chatOnlineUsers.entries()),
+      chatOnlineMembers: Array.from(chatOnlineUsers),
       chatId: chatid,
     });
   });
@@ -332,7 +328,7 @@ io.on("connection", async (socket) => {
     chatOnlineUsers.delete(user._id.toString());
     io.emit(ONLINE_USERS, Array.from(onlineUsers));
     socket.broadcast.emit(CHAT_ONLINE_USERS, {
-      chatOnlineMembers: Object.fromEntries(chatOnlineUsers.entries()),
+      chatOnlineMembers: Array.from(chatOnlineUsers),
     });
 
     userSocketIds.delete(user._id.toString()); // will remove members from map once they dissconnected ...
